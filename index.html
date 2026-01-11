@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mathventure - Petualangan Numerasi & Ekonomi</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600&display=swap');
+        
+        body {
+            font-family: 'Fredoka', sans-serif;
+            user-select: none;
+            touch-action: manipulation;
+        }
+
+        #player {
+            position: absolute;
+            z-index: 20;
+            transition: left 0.4s linear, top 0.4s linear;
+        }
+
+        #player-sprite {
+            width: 48px; 
+            height: 48px; 
+            background-size: 192px 192px;
+            image-rendering: pixelated;
+            background-repeat: no-repeat;
+        }
+
+        .tree-sprite {
+            background-repeat: no-repeat;
+            image-rendering: pixelated;
+            display: block;
+            transform-origin: bottom center;
+        }
+
+        .shake {
+            animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
+        }
+
+        @keyframes shake {
+            10%, 90% { transform: translate3d(-1px, 0, 0); }
+            20%, 80% { transform: translate3d(2px, 0, 0); }
+            30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+            40%, 60% { transform: translate3d(4px, 0, 0); }
+        }
+
+        .wood-drop {
+            animation: float-up 1s ease-out forwards;
+        }
+
+        @keyframes float-up {
+            0% { transform: translateY(0); opacity: 1; }
+            100% { transform: translateY(-50px); opacity: 0; }
+        }
+
+        #game-world {
+            background-size: 100% 100%;
+            background-position: center;
+            image-rendering: pixelated;
+        }
+
+        #base-building {
+            width: 130px;
+            height: 130px;
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: bottom center;
+            cursor: pointer;
+            transition: transform 0.2s;
+            filter: drop-shadow(0 10px 15px rgba(0,0,0,0.4));
+        }
+
+        .custom-scroll::-webkit-scrollbar {
+            width: 4px;
+        }
+        .custom-scroll::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 10px;
+        }
+        
+        .tab-active {
+            border-bottom: 4px solid #f59e0b;
+            color: #f59e0b;
+        }
+    </style>
+</head>
+<body class="bg-slate-900 text-white overflow-hidden">
+
+    <div id="app" class="relative w-full h-screen max-w-md mx-auto bg-green-500 overflow-hidden shadow-2xl border-x-4 border-slate-800">
+        
+        <!-- 1. LOADING SCREEN -->
+        <div id="screen-loading" class="absolute inset-0 z-50 bg-green-600 flex flex-col items-center justify-center text-white">
+            <div class="text-4xl font-bold mb-4">Mathventure</div>
+            <div class="w-48 h-4 bg-green-800 rounded-full overflow-hidden">
+                <div id="loading-bar" class="w-0 h-full bg-yellow-400 transition-all duration-1000"></div>
+            </div>
+            <div id="loading-text" class="mt-4 text-sm opacity-70 uppercase tracking-widest text-center px-4">
+                Memeriksa Koneksi...
+            </div>
+        </div>
+
+        <!-- 2. LOGIN SCREEN -->
+        <div id="screen-login" class="hidden absolute inset-0 bg-slate-100 text-slate-900 p-8 flex flex-col justify-center">
+            <div class="mb-8 text-center">
+                <h1 class="text-3xl font-bold text-green-600">Masuk Akun</h1>
+                <p class="text-slate-500 text-sm">Ayo mulai petualangan belajarmu!</p>
+            </div>
+            <div class="space-y-4">
+                <input id="login-user" type="text" placeholder="Masukkan Nama" class="w-full p-4 rounded-2xl border-2 border-slate-200 outline-none focus:border-green-500">
+                <button onclick="handleLogin()" class="w-full py-4 bg-green-500 text-white rounded-2xl font-bold shadow-lg active:scale-95 transition-transform">MASUK / DAFTAR</button>
+            </div>
+        </div>
+
+        <!-- 3. ROLE SELECTION -->
+        <div id="screen-role" class="hidden absolute inset-0 bg-white text-slate-900 p-8 flex flex-col items-center justify-center">
+            <h2 class="text-2xl font-bold mb-8">Pilih Peran Kamu</h2>
+            <div class="grid grid-cols-1 gap-4 w-full">
+                <button onclick="selectRole('Siswa')" class="p-5 rounded-3xl border-4 border-slate-100 bg-slate-50 flex items-center gap-6 hover:border-green-500 transition-all">
+                    <div class="bg-green-100 p-3 rounded-2xl text-green-600"><i data-lucide="graduation-cap"></i></div>
+                    <div class="text-left"><div class="font-bold">Siswa</div><div class="text-[10px] text-slate-500 italic">Bermain & Belajar Mandiri</div></div>
+                </button>
+                <button onclick="selectRole('Guru')" class="p-5 rounded-3xl border-4 border-slate-100 bg-slate-50 flex items-center gap-6 hover:border-blue-500 transition-all">
+                    <div class="bg-blue-100 p-3 rounded-2xl text-blue-600"><i data-lucide="presentation"></i></div>
+                    <div class="text-left"><div class="font-bold">Guru</div><div class="text-[10px] text-slate-500 italic">Pantau Progres Kelas</div></div>
+                </button>
+                <button onclick="selectRole('Ortu')" class="p-5 rounded-3xl border-4 border-slate-100 bg-slate-50 flex items-center gap-6 hover:border-purple-500 transition-all">
+                    <div class="bg-purple-100 p-3 rounded-2xl text-purple-600"><i data-lucide="users"></i></div>
+                    <div class="text-left"><div class="font-bold">Orang Tua</div><div class="text-[10px] text-slate-500 italic">Laporan Harian Anak</div></div>
+                </button>
+            </div>
+            <button onclick="changeScreen('login')" class="mt-8 text-slate-400 text-sm font-bold flex items-center gap-2">
+                <i data-lucide="log-out" class="w-4 h-4"></i> Keluar
+            </button>
+        </div>
+
+        <!-- 4. CHARACTER SELECTION -->
+        <div id="screen-select" class="hidden absolute inset-0 bg-slate-50 text-slate-900 p-8 flex flex-col items-center justify-center">
+            <h2 class="text-2xl font-bold mb-10">Pilih Karaktermu</h2>
+            <div class="grid grid-cols-2 gap-8 w-full">
+                <div onclick="selectChar('Laki-laki')" id="char-boy" class="cursor-pointer p-4 rounded-3xl border-4 border-transparent bg-white shadow-xl flex flex-col items-center transition-all hover:scale-105">
+                    <div class="w-24 h-24 bg-blue-100 rounded-full flex items-center justify-center mb-4 overflow-hidden">
+                        <img src="Laki-Laki.png" class="w-16 h-16 object-cover" onerror="this.src='https://api.dicebear.com/7.x/pixel-art/svg?seed=boy'">
+                    </div>
+                    <span class="font-bold">Laki-laki</span>
+                </div>
+                <div onclick="selectChar('Perempuan')" id="char-girl" class="cursor-pointer p-4 rounded-3xl border-4 border-transparent bg-white shadow-xl flex flex-col items-center transition-all hover:scale-105">
+                    <div class="w-24 h-24 bg-pink-100 rounded-full flex items-center justify-center mb-4 overflow-hidden">
+                        <img src="Perempuan.png" class="w-16 h-16 object-cover" onerror="this.src='https://api.dicebear.com/7.x/pixel-art/svg?seed=girl'">
+                    </div>
+                    <span class="font-bold">Perempuan</span>
+                </div>
+            </div>
+            <button onclick="changeScreen('menu')" id="btn-start-game" class="mt-12 w-full py-4 bg-green-500 text-white rounded-2xl font-bold opacity-50 cursor-not-allowed shadow-lg" disabled>LANJUT KE MENU</button>
+        </div>
+
+        <!-- 5. MAIN MENU -->
+        <div id="screen-menu" class="hidden absolute inset-0 bg-gradient-to-b from-green-400 to-green-600 flex flex-col items-center justify-center p-6 text-center text-white">
+            <h1 class="text-5xl font-bold mb-8 drop-shadow-lg text-white">Mathventure</h1>
+            <div class="w-full space-y-4">
+                <button onclick="changeScreen('game')" class="w-full py-4 bg-orange-500 hover:bg-orange-600 rounded-2xl border-b-8 border-orange-800 flex items-center justify-center gap-3 text-xl font-bold transition-all active:translate-y-1 active:border-b-4">
+                    <i data-lucide="play-circle"></i> MULAI BERMAIN
+                </button>
+                <button onclick="changeScreen('comic')" class="w-full py-4 bg-blue-500 hover:bg-blue-600 rounded-2xl border-b-8 border-blue-800 flex items-center justify-center gap-3 text-xl font-bold transition-all active:translate-y-1 active:border-b-4">
+                    <i data-lucide="book-open"></i> MODUL KOMIK
+                </button>
+                <button onclick="changeScreen('leaderboard')" class="w-full py-4 bg-yellow-500 hover:bg-yellow-600 rounded-2xl border-b-8 border-yellow-800 flex items-center justify-center gap-3 text-xl font-bold text-yellow-900 transition-all active:translate-y-1 active:border-b-4">
+                    <i data-lucide="trophy"></i> LEADERBOARD
+                </button>
+                <button onclick="changeScreen('role')" class="w-full py-4 bg-slate-800/50 hover:bg-slate-800 rounded-2xl border-b-8 border-slate-900 flex items-center justify-center gap-3 text-xl font-bold transition-all active:translate-y-1 active:border-b-4">
+                    <i data-lucide="log-out"></i> LOG OUT
+                </button>
+            </div>
+        </div>
+
+        <!-- 6. GAME SCREEN -->
+        <div id="screen-game" class="hidden absolute inset-0">
+            <div id="game-world" class="relative w-full h-full bg-green-500 overflow-hidden">
+                <div id="base-container" class="absolute z-10" style="left: 72%; top: 55%; transform: translate(-50%, -50%);">
+                    <div id="base-building" onclick="toggleBaseMenu()"></div>
+                    <div class="absolute -bottom-6 left-1/2 -translate-x-1/2 bg-black/50 px-3 py-1 rounded-full text-[10px] whitespace-nowrap border border-white/20">
+                        Base Level <span id="ui-base-lv-label">1</span>
+                    </div>
+                </div>
+                <div id="trees-container"></div>
+                <div id="drops-container"></div>
+                <div id="player" style="left: 30%; top: 75%; transform: translate(-50%, -50%);">
+                    <div id="player-sprite"></div>
+                    <div class="absolute -top-4 bg-black/50 px-2 rounded text-[10px] text-white whitespace-nowrap">Kamu</div>
+                </div>
+            </div>
+
+            <!-- HUD Game Updated -->
+            <div class="absolute top-0 inset-x-0 p-4 flex justify-between items-start pointer-events-none">
+                <div class="flex flex-col gap-2 pointer-events-auto">
+                    <div class="bg-black/60 px-3 py-1.5 rounded-xl border border-white/20 flex items-center gap-2 shadow-lg text-white">
+                        <i data-lucide="package" class="w-4 h-4 text-orange-400"></i>
+                        <span id="ui-wood" class="font-bold text-xs">Kayu: 0</span>
+                    </div>
+                    <div class="bg-black/60 px-3 py-1.5 rounded-xl border border-white/20 flex items-center gap-2 shadow-lg text-white">
+                        <i data-lucide="coins" class="w-4 h-4 text-yellow-400"></i>
+                        <span id="ui-gold" class="font-bold text-xs">Gold: 0</span>
+                    </div>
+                    <!-- Materials Summary -->
+                    <div class="flex gap-1 overflow-x-auto max-w-[120px]">
+                        <div class="bg-slate-800/80 p-1 rounded text-[8px] flex items-center gap-1"><i data-lucide="mountain" class="w-2 h-2"></i><span id="ui-sand">0</span></div>
+                        <div class="bg-slate-800/80 p-1 rounded text-[8px] flex items-center gap-1"><i data-lucide="box" class="w-2 h-2"></i><span id="ui-cement">0</span></div>
+                        <div class="bg-slate-800/80 p-1 rounded text-[8px] flex items-center gap-1"><i data-lucide="grid" class="w-2 h-2"></i><span id="ui-bricks">0</span></div>
+                    </div>
+                </div>
+                <div class="flex gap-2 pointer-events-auto">
+                    <button onclick="openMarket()" class="p-2 bg-yellow-500 text-yellow-900 rounded-xl shadow-lg hover:bg-yellow-600 transition-colors">
+                        <i data-lucide="shopping-cart"></i>
+                    </button>
+                    <button onclick="changeScreen('menu')" class="p-2 bg-red-500 text-white rounded-xl shadow-lg hover:bg-red-600 transition-colors">
+                        <i data-lucide="home"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 7. DETAILED DASHBOARD (MURNI PROGRES AKADEMIK) -->
+        <div id="screen-dashboard" class="hidden absolute inset-0 bg-slate-50 text-slate-900 flex flex-col">
+            <div class="p-6 bg-white border-b sticky top-0 z-10">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 id="dash-title" class="text-xl font-bold text-slate-800">Laporan Akademik</h2>
+                    <button onclick="changeScreen('role')" class="p-2 bg-slate-100 rounded-xl flex items-center gap-2 font-bold text-xs text-slate-500">
+                        <i data-lucide="log-out" class="w-4 h-4"></i> KELUAR
+                    </button>
+                </div>
+                <div id="dash-user-info" class="flex items-center gap-3">
+                    <div class="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center text-blue-600">
+                        <i data-lucide="user"></i>
+                    </div>
+                    <div>
+                        <div class="font-bold text-sm" id="dash-target-name">Ananda Siti</div>
+                        <div class="text-[10px] text-slate-400">Sinkronisasi Terakhir: Baru Saja</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex-1 overflow-y-auto p-6 space-y-6 custom-scroll">
+                <!-- Notifikasi Kesulitan (Alert) -->
+                <div id="dash-alert" class="bg-red-50 border-l-4 border-red-500 p-4 rounded-r-2xl hidden">
+                    <div class="flex items-start gap-3">
+                        <i data-lucide="alert-triangle" class="w-5 h-5 text-red-500 mt-0.5"></i>
+                        <div>
+                            <div class="font-bold text-xs text-red-800">Perhatian Khusus Diperlukan!</div>
+                            <p class="text-[10px] text-red-600 leading-relaxed" id="dash-alert-text">Siswa sering melakukan kesalahan pada materi Perkalian Kayu.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 5 Materi Pelajaran -->
+                <div class="space-y-4">
+                    <div class="flex justify-between items-center">
+                        <h3 class="font-bold text-sm text-slate-600 uppercase tracking-wider">Penguasaan Materi</h3>
+                        <span class="text-[10px] text-slate-400">Total Akurasi: <span id="dash-total-acc">85%</span></span>
+                    </div>
+                    <div id="dash-materials-list" class="space-y-4">
+                        <!-- Konten materi akan di-render di sini -->
+                    </div>
+                </div>
+
+                <!-- Langkah Evaluasi Masa Depan -->
+                <div class="bg-indigo-600 text-white p-6 rounded-3xl shadow-xl relative overflow-hidden">
+                    <i data-lucide="graduation-cap" class="absolute -right-4 -bottom-4 w-24 h-24 opacity-20"></i>
+                    <h4 class="font-bold mb-2 flex items-center gap-2 text-sm"><i data-lucide="list-checks" class="w-4 h-4"></i> Langkah Evaluasi & Solusi</h4>
+                    <p id="dash-recommendation" class="text-[11px] opacity-90 leading-relaxed italic">"Berdasarkan progres saat ini, disarankan untuk memperbanyak simulasi visual melalui Modul Komik sebelum melanjutkan ke tantangan berikutnya."</p>
+                </div>
+
+                <!-- Informasi Tambahan -->
+                <div class="p-4 bg-white rounded-2xl border text-center">
+                    <p class="text-[10px] text-slate-400 leading-relaxed">
+                        Data ini dihasilkan berdasarkan kemampuan menjawab kuis numerasi dan manajemen sumber daya ekonomi di dalam sistem Mathventure.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 8. LEADERBOARD -->
+        <div id="screen-leaderboard" class="hidden absolute inset-0 bg-slate-50 text-slate-900 p-6 overflow-y-auto">
+            <div class="flex justify-between items-center mb-8">
+                <div class="flex items-center gap-4">
+                    <button onclick="changeScreen('menu')" class="p-2 bg-white rounded-xl shadow-sm"><i data-lucide="chevron-left"></i></button>
+                    <h2 class="text-2xl font-bold">Leaderboard</h2>
+                </div>
+                <button onclick="changeScreen('role')" class="p-2 bg-red-100 text-red-600 rounded-xl shadow-sm"><i data-lucide="log-out"></i></button>
+            </div>
+            <div class="space-y-4" id="leaderboard-list"></div>
+        </div>
+
+        <!-- MODALS (Kuis, Pasar, Base) -->
+        <div id="modal-quiz" class="hidden absolute inset-0 z-40 bg-black/80 flex items-center justify-center p-6 text-slate-900">
+            <div class="bg-white w-full rounded-3xl p-6 text-center shadow-2xl border-t-8 border-orange-500">
+                <h3 id="quiz-title" class="text-xl font-bold text-orange-600 mb-2 uppercase">TEBAS POHON!</h3>
+                <p id="quiz-hint" class="text-blue-500 text-[10px] font-bold h-4 italic mb-4"></p>
+                <div id="quiz-question" class="text-5xl font-bold mb-8 text-slate-800 tracking-tighter">15 + 7 = ?</div>
+                <div class="grid grid-cols-2 gap-4" id="quiz-options"></div>
+            </div>
+        </div>
+
+        <div id="modal-market" class="hidden absolute inset-0 z-40 bg-black/80 flex items-center justify-center p-4 text-slate-900">
+            <div class="bg-white w-full max-h-[90%] rounded-[40px] overflow-hidden shadow-2xl flex flex-col">
+                <div class="p-6 border-b flex justify-between items-center bg-yellow-50">
+                    <h3 class="text-xl font-bold text-yellow-700 flex items-center gap-2"><i data-lucide="store"></i> Pasar Desa</h3>
+                    <button onclick="document.getElementById('modal-market').classList.add('hidden')" class="p-2 bg-white rounded-full"><i data-lucide="x" class="w-5 h-5 text-slate-400"></i></button>
+                </div>
+                
+                <div class="flex border-b bg-white">
+                    <button onclick="switchMarketTab('sell')" id="tab-sell" class="flex-1 py-4 font-bold text-sm tab-active">JUAL HASIL</button>
+                    <button onclick="switchMarketTab('buy')" id="tab-buy" class="flex-1 py-4 font-bold text-sm">BELI BAHAN</button>
+                </div>
+
+                <div class="flex-1 overflow-y-auto p-6 space-y-4 custom-scroll" id="market-items-container"></div>
+
+                <div class="p-6 bg-slate-50 border-t flex justify-between items-center">
+                    <div class="flex items-center gap-2 text-yellow-700">
+                        <i data-lucide="coins" class="w-5 h-5"></i>
+                        <span class="text-lg font-bold" id="market-gold-display">0</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="modal-base" class="hidden absolute inset-0 z-40 bg-black/60 flex items-end justify-center text-slate-900">
+            <div class="bg-white w-full rounded-t-[40px] p-8 pb-12 shadow-2xl border-t-4 border-orange-200">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-2xl font-bold">Membangun Desa</h3>
+                    <button onclick="toggleBaseMenu()"><i data-lucide="x" class="text-slate-400"></i></button>
+                </div>
+                <div class="bg-slate-100 p-5 rounded-3xl mb-6 border-2 border-slate-200">
+                    <p class="text-xs text-slate-500 font-bold mb-3 uppercase tracking-wider">Kebutuhan Bangunan:</p>
+                    <div class="grid grid-cols-2 gap-3" id="base-requirements-list"></div>
+                </div>
+                <button id="btn-upgrade" onclick="upgradeBase()" class="w-full py-4 bg-orange-500 text-white rounded-2xl font-bold shadow-lg opacity-50 cursor-not-allowed transition-all" disabled>UPGRADE BASE</button>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        const ASSETS = {
+            background: 'base2.png', baseImg: 'base1.png', idle: 'Idle.png', walk: 'Walk.png',
+            treeSheet: '16x32 trees.png', treeWidth: 16, treeHeight: 32, treeCols: 4, treeRows: 1, treeScale: 3.5 
+        };
+
+        const PRICES = { wood: 15, sand: 50, cement: 60, bricks: 40, sellRate: 0.75 };
+
+        const CHAR_CONFIG = { size: 16, frames: 4, row: { down: 0, left: 1, right: 2, up: 3 }, scale: 3 };
+        const GRASS_ZONES = [
+            { xMin: 25, xMax: 75, yMin: 20, yMax: 40 }, 
+            { xMin: 60, xMax: 85, yMin: 35, yMax: 45 },
+            { xMin: 75, xMax: 90, yMin: 70, yMax: 85 }
+        ];
+
+        let state = {
+            screen: 'loading', role: 'Siswa', gender: 'Laki-laki', userName: 'Kamu',
+            wood: 0, gold: 0, 
+            inventory: { sand: 0, cement: 0, bricks: 0 },
+            baseLevel: 1, score: 0, trees: [], currentTreeId: null,
+            quiz: { ans: 0, wrongCount: 0 },
+            marketTab: 'sell',
+            // Data Analitik Materi untuk Laporan Ortu/Guru
+            analytics: [
+                { id: 'add', name: 'Penjumlahan Dasar', score: 92, color: 'bg-green-500', icon: 'plus-circle' },
+                { id: 'sub', name: 'Pengurangan Hutan', score: 85, color: 'bg-blue-500', icon: 'minus-circle' },
+                { id: 'mul', name: 'Perkalian Kayu', score: 45, color: 'bg-red-500', icon: 'x-circle' }, // Mengalami kesulitan
+                { id: 'div', name: 'Pembagian Hasil', score: 70, color: 'bg-orange-500', icon: 'divide-circle' },
+                { id: 'eco', name: 'Ekonomi Laba-Rugi', score: 88, color: 'bg-yellow-500', icon: 'trending-up' }
+            ],
+            anim: { action: 'idle', dir: 'down', frame: 0 }
+        };
+
+        window.onload = () => {
+            lucide.createIcons();
+            document.getElementById('game-world').style.backgroundImage = `url('${ASSETS.background}')`;
+            document.getElementById('base-building').style.backgroundImage = `url('${ASSETS.baseImg}')`;
+            let progress = 0;
+            const textEl = document.getElementById('loading-text');
+            const interval = setInterval(() => {
+                progress += 5;
+                document.getElementById('loading-bar').style.width = progress + '%';
+                if (progress === 30) textEl.innerText = "Memeriksa Koneksi...";
+                if (progress === 60) textEl.innerText = "Sinkronisasi Akademik...";
+                if (progress >= 100) { clearInterval(interval); setTimeout(() => changeScreen('login'), 500); }
+            }, 50);
+            initTrees();
+            startAnimationLoop();
+        };
+
+        function startAnimationLoop() { setInterval(() => { if (state.screen === 'game') { state.anim.frame = (state.anim.frame + 1) % CHAR_CONFIG.frames; updateSpriteFrame(); } }, 150); }
+        function updateSpriteFrame() {
+            const spriteEl = document.getElementById('player-sprite');
+            const imgUrl = state.anim.action === 'walk' ? ASSETS.walk : ASSETS.idle;
+            spriteEl.style.backgroundImage = `url('${imgUrl}')`;
+            spriteEl.style.backgroundPosition = `-${state.anim.frame * 48}px -${CHAR_CONFIG.row[state.anim.dir] * 48}px`;
+        }
+
+        function movePlayerTo(x, y, cb) {
+            const p = document.getElementById('player');
+            const dx = x - (parseFloat(p.style.left) || 30);
+            state.anim.dir = dx > 0 ? 'right' : 'left';
+            state.anim.action = 'walk';
+            p.style.left = x + '%'; p.style.top = y + '%';
+            setTimeout(() => { state.anim.action = 'idle'; if (cb) cb(); }, 400);
+        }
+
+        function handleLogin() { 
+            const user = document.getElementById('login-user').value;
+            if (!user) return alert("Silakan isi nama!"); 
+            state.userName = user;
+            changeScreen('role'); 
+        }
+
+        function selectRole(r) { 
+            state.role = r; 
+            if (r === 'Siswa') changeScreen('select'); 
+            else { renderDashboard(); changeScreen('dashboard'); }
+        }
+
+        function renderDashboard() {
+            document.getElementById('dash-title').innerText = `Laporan ${state.role}`;
+            document.getElementById('dash-target-name').innerText = state.role === 'Ortu' ? `Ananda ${state.userName}` : `Progres Kelas - ${state.userName}`;
+            
+            const listContainer = document.getElementById('dash-materials-list');
+            listContainer.innerHTML = '';
+            
+            let totalAcc = 0;
+            let weakMaterial = null;
+
+            state.analytics.forEach(m => {
+                totalAcc += m.score;
+                if (m.score < 60) weakMaterial = m.name;
+
+                const el = document.createElement('div');
+                el.className = "bg-white p-4 rounded-2xl border border-slate-100 shadow-sm";
+                el.innerHTML = `
+                    <div class="flex justify-between items-center mb-2">
+                        <div class="flex items-center gap-2">
+                            <i data-lucide="${m.icon}" class="w-4 h-4 text-slate-400"></i>
+                            <span class="text-[11px] font-bold text-slate-700">${m.name}</span>
+                        </div>
+                        <span class="text-[10px] font-bold ${m.score < 60 ? 'text-red-500' : 'text-slate-500'}">${m.score}%</span>
+                    </div>
+                    <div class="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                        <div class="h-full ${m.color} transition-all duration-1000" style="width: ${m.score}%"></div>
+                    </div>
+                `;
+                listContainer.appendChild(el);
+            });
+
+            document.getElementById('dash-total-acc').innerText = Math.floor(totalAcc / 5) + "%";
+
+            // Update Notifikasi Alert & Rekomendasi
+            const alertBox = document.getElementById('dash-alert');
+            const alertText = document.getElementById('dash-alert-text');
+            const recText = document.getElementById('dash-recommendation');
+
+            if (weakMaterial) {
+                alertBox.classList.remove('hidden');
+                alertText.innerText = state.role === 'Ortu' 
+                    ? `Ananda mengalami hambatan signifikan pada materi ${weakMaterial}. Segera berikan bimbingan tambahan.` 
+                    : `Terdapat tren penurunan pada penguasaan materi ${weakMaterial}. Disarankan untuk memberikan materi remedial.`;
+                
+                recText.innerText = state.role === 'Ortu'
+                    ? `"Ananda ${state.userName} perlu penguatan konsep pada materi ${weakMaterial}. Gunakan Modul Komik Bab 3 dan 4 untuk membantu visualisasi anak."`
+                    : `"Instruksi kelas untuk materi ${weakMaterial} perlu ditinjau ulang. Siswa kesulitan memproses langkah pengerjaan yang kompleks."`;
+            } else {
+                alertBox.classList.add('hidden');
+                recText.innerText = `"Progres sangat memuaskan! Siswa telah menguasai kompetensi dasar dengan baik. Lanjutkan ke tantangan pengembangan selanjutnya."`;
+            }
+            
+            lucide.createIcons();
+        }
+
+        function changeScreen(s) {
+            const list = ['loading', 'login', 'role', 'select', 'menu', 'game', 'dashboard', 'leaderboard'];
+            list.forEach(x => { if(document.getElementById(`screen-${x}`)) document.getElementById(`screen-${x}`).classList.add('hidden')});
+            document.getElementById(`screen-${s}`).classList.remove('hidden');
+            state.screen = s;
+            if (s === 'leaderboard') renderLeaderboard();
+            lucide.createIcons();
+        }
+
+        // FUNGSI PASAR (SESUAI REQUEST: TETAP ADA & BAGUS)
+        function openMarket() {
+            document.getElementById('modal-market').classList.remove('hidden');
+            renderMarketContent();
+            lucide.createIcons();
+        }
+
+        function switchMarketTab(tab) {
+            state.marketTab = tab;
+            document.getElementById('tab-sell').classList.toggle('tab-active', tab === 'sell');
+            document.getElementById('tab-buy').classList.toggle('tab-active', tab === 'buy');
+            renderMarketContent();
+        }
+
+        function renderMarketContent() {
+            const container = document.getElementById('market-items-container');
+            document.getElementById('market-gold-display').innerText = state.gold;
+            container.innerHTML = '';
+
+            if (state.marketTab === 'sell') {
+                const itemsToSell = [
+                    { key: 'wood', name: 'Kayu Pinus', price: PRICES.wood, count: state.wood, icon: 'package' },
+                    { key: 'sand', name: 'Jual Balik Pasir', price: Math.floor(PRICES.sand * PRICES.sellRate), count: state.inventory.sand, icon: 'mountain' },
+                    { key: 'cement', name: 'Jual Balik Semen', price: Math.floor(PRICES.cement * PRICES.sellRate), count: state.inventory.cement, icon: 'box' },
+                    { key: 'bricks', name: 'Jual Balik Bata', price: Math.floor(PRICES.bricks * PRICES.sellRate), count: state.inventory.bricks, icon: 'grid' }
+                ];
+                itemsToSell.forEach(item => {
+                    const el = document.createElement('div');
+                    el.className = "flex justify-between items-center p-4 bg-slate-50 rounded-3xl border border-slate-100 shadow-sm";
+                    el.innerHTML = `<div class="flex items-center gap-3"><div class="bg-white p-2 rounded-xl text-yellow-600"><i data-lucide="${item.icon}"></i></div><div><div class="font-bold text-sm">${item.name}</div><div class="text-[10px] text-slate-400">Miliki: ${item.count} | Harga: ${item.price} Gold</div></div></div><button onclick="tradeItem('sell', '${item.key}', ${item.price})" class="px-5 py-2 bg-yellow-500 text-yellow-900 font-bold rounded-xl active:scale-95 transition-all ${item.count <= 0 ? 'opacity-30' : ''}">JUAL</button>`;
+                    container.appendChild(el);
+                });
+            } else {
+                const itemsToBuy = [
+                    { key: 'sand', name: 'Pasir Bangunan', price: PRICES.sand, icon: 'mountain' },
+                    { key: 'cement', name: 'Semen Kuat', price: PRICES.cement, icon: 'box' },
+                    { key: 'bricks', name: 'Batu Bata Merah', price: PRICES.bricks, icon: 'grid' }
+                ];
+                itemsToBuy.forEach(item => {
+                    const el = document.createElement('div');
+                    el.className = "flex justify-between items-center p-4 bg-slate-50 rounded-3xl border border-slate-100 shadow-sm";
+                    el.innerHTML = `<div class="flex items-center gap-3"><div class="bg-white p-2 rounded-xl text-blue-500"><i data-lucide="${item.icon}"></i></div><div><div class="font-bold text-sm">${item.name}</div><div class="text-[10px] text-slate-400">Harga: ${item.price} Gold</div></div></div><button onclick="tradeItem('buy', '${item.key}', ${item.price})" class="px-5 py-2 bg-green-500 text-white font-bold rounded-xl active:scale-95 transition-all ${state.gold < item.price ? 'opacity-30' : ''}">BELI</button>`;
+                    container.appendChild(el);
+                });
+            }
+            lucide.createIcons();
+        }
+
+        function tradeItem(type, key, price) {
+            if (type === 'sell') {
+                if (key === 'wood' && state.wood > 0) { state.wood--; state.gold += price; }
+                else if (state.inventory[key] > 0) { state.inventory[key]--; state.gold += price; }
+            } else {
+                if (state.gold >= price) { state.gold -= price; state.inventory[key]++; }
+                else { alert("Gold tidak cukup!"); return; }
+            }
+            updateUI();
+            renderMarketContent();
+        }
+
+        function toggleBaseMenu() {
+            const m = document.getElementById('modal-base');
+            if (m.classList.contains('hidden')) { movePlayerTo(72, 65, () => { m.classList.remove('hidden'); renderBaseRequirements(); }); } else m.classList.add('hidden');
+        }
+
+        function renderBaseRequirements() {
+            const reqList = document.getElementById('base-requirements-list'); reqList.innerHTML = '';
+            const reqs = { 1: { sand: 1, cement: 1, bricks: 0 }, 2: { sand: 2, cement: 2, bricks: 2 }, 3: { sand: 4, cement: 3, bricks: 5 } }[state.baseLevel] || { sand: 10, cement: 10, bricks: 10 };
+            let allMet = true;
+            for (const [key, needed] of Object.entries(reqs)) {
+                if (needed === 0) continue;
+                const owned = state.inventory[key] || 0; const met = owned >= needed; if (!met) allMet = false;
+                const el = document.createElement('div'); el.className = `p-2 rounded-xl text-[10px] font-bold border ${met ? 'bg-green-50 border-green-200 text-green-700' : 'bg-red-50 border-red-200 text-red-700'}`; el.innerHTML = `${{ sand: 'Pasir', cement: 'Semen', bricks: 'Bata' }[key]}: ${owned}/${needed}`; reqList.appendChild(el);
+            }
+            const btn = document.getElementById('btn-upgrade'); btn.disabled = !allMet; btn.style.opacity = allMet ? '1' : '0.5';
+        }
+
+        function upgradeBase() { state.baseLevel++; updateUI(); toggleBaseMenu(); alert("LEVEL UP!"); }
+
+        function initTrees() {
+            const c = document.getElementById('trees-container'); c.innerHTML = ''; state.trees = [];
+            for (let i = 0; i < 4; i++) {
+                const z = GRASS_ZONES[Math.floor(Math.random() * 3)];
+                const tree = { id: i, x: Math.random() * (z.xMax - z.xMin) + z.xMin, y: Math.random() * (z.yMax - z.yMin) + z.yMin, health: 2 };
+                state.trees.push(tree);
+                const el = document.createElement('div'); el.id = `tree-${i}`; el.className = 'absolute cursor-pointer z-10'; el.style.left = tree.x + '%'; el.style.top = tree.y + '%';
+                el.innerHTML = `<div class="relative flex flex-col items-center"><div class="tree-sprite" style="width:16px;height:32px;background-image:url('${ASSETS.treeSheet}');background-position:0 0;transform:scale(3.5)"></div><div class="absolute -top-4 w-10 h-1.5 bg-red-600 rounded-full border border-black/20 overflow-hidden"><div class="hp-bar w-full h-full bg-green-400 transition-all"></div></div></div>`;
+                el.onclick = () => movePlayerTo(tree.x, tree.y + 5, () => { state.currentTreeId = i; generateQuiz(tree.health); document.getElementById('modal-quiz').classList.remove('hidden'); });
+                c.appendChild(el);
+            }
+        }
+
+        function generateQuiz(hp) {
+            state.quiz.wrongCount = 0; const a = Math.floor(Math.random() * 15) + 5, b = Math.floor(Math.random() * 10) + 2; state.quiz.ans = a + b;
+            document.getElementById('quiz-title').innerText = `Hit ke-${2-hp+1}`; document.getElementById('quiz-question').innerText = `${a} + ${b} = ?`; document.getElementById('quiz-hint').innerText = "";
+            const opts = [state.quiz.ans, state.quiz.ans + 2, state.quiz.ans - 3, state.quiz.ans + 5].sort(() => Math.random() - 0.5);
+            const container = document.getElementById('quiz-options'); container.innerHTML = '';
+            opts.forEach(o => { const b = document.createElement('button'); b.className = 'py-4 bg-slate-50 rounded-2xl font-bold text-2xl border-b-4 border-slate-300'; b.innerText = o; b.onclick = () => { if(o === state.quiz.ans) handleCorrect(); else handleWrong(); }; container.appendChild(b); });
+        }
+
+        function handleWrong() { state.quiz.wrongCount++; const m = document.querySelector('#modal-quiz > div'); m.classList.add('shake'); if (state.quiz.wrongCount >= 2) document.getElementById('quiz-hint').innerText = "Hint: Coba hitung satuannya dulu!"; }
+        function handleCorrect() { const t = state.trees[state.currentTreeId]; t.health--; state.score += 50; document.getElementById('modal-quiz').classList.add('hidden'); const el = document.getElementById(`tree-${state.currentTreeId}`); el.classList.add('shake'); el.querySelector('.hp-bar').style.width = (t.health/2*100)+'%'; if(t.health <= 0) { el.style.opacity = '0.4'; state.wood++; showDrop(t.x, t.y); } updateUI(); }
+        function showDrop(x, y) { const d = document.createElement('div'); d.className = 'absolute wood-drop z-30 bg-orange-800 text-white text-[8px] p-1 border border-white font-bold'; d.style.left = x + '%'; d.style.top = y + '%'; d.innerText = '+1 KAYU'; document.getElementById('drops-container').appendChild(d); setTimeout(() => d.remove(), 1000); }
+        function updateUI() { document.getElementById('ui-wood').innerText = `Kayu: ${state.wood}`; document.getElementById('ui-gold').innerText = `Gold: ${state.gold}`; document.getElementById('ui-base-lv-label').innerText = state.baseLevel; document.getElementById('ui-sand').innerText = state.inventory.sand; document.getElementById('ui-cement').innerText = state.inventory.cement; document.getElementById('ui-bricks').innerText = state.inventory.bricks; }
+        function selectChar(g) { state.gender = g; document.getElementById('char-boy').style.borderColor = g === 'Laki-laki' ? '#3b82f6' : 'transparent'; document.getElementById('char-girl').style.borderColor = g === 'Perempuan' ? '#ec4899' : 'transparent'; document.getElementById('btn-start-game').disabled = false; document.getElementById('btn-start-game').style.opacity = '1'; }
+        function renderLeaderboard() { const l = document.getElementById('leaderboard-list'); l.innerHTML = ''; [...state.leaderboard, {name: 'Kamu', score: state.score, level: state.baseLevel}].sort((a,b) => b.score - a.score).forEach((p, i) => { const item = document.createElement('div'); item.className = `flex justify-between p-4 rounded-xl ${p.name === 'Kamu' ? 'bg-orange-100 border border-orange-300' : 'bg-white shadow-sm'}`; item.innerHTML = `<span>${i+1}. ${p.name} (Lv ${p.level})</span><span class="font-bold text-green-600">${p.score}</span>`; l.appendChild(item); }); }
+    </script>
+</body>
+</html>
